@@ -1,0 +1,121 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+// -------------------------------------------------
+// KONFIGURASI PIN
+// -------------------------------------------------
+#define DHTPIN D5          // Data DHT22
+#define DHTTYPE DHT22
+
+const int trigPin = D6;    // JSN-SR04T TRIG
+const int echoPin = D7;    // JSN-SR04T ECHO
+
+const int rainPin = D0;    // MH-RD digital output (HIGH = tidak hujan, LOW = hujan)
+
+// Tinggi bak / sungai dalam cm
+const float tinggiBak = 100.0;
+
+// -------------------------------------------------
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// -------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  pinMode(rainPin, INPUT);  // MH-RD output digital
+  
+  dht.begin();
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print(" Water Monitoring ");
+  delay(1500);
+  lcd.clear();
+}
+
+// -------------------------------------------------
+void loop() {
+
+  // ==== ULTRASONIC JSN ====
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  float distance = duration * 0.034 / 2.0;
+
+  // Hitung tinggi air (cm)
+  float tinggiAir = tinggiBak - distance;
+  if (tinggiAir < 0) tinggiAir = 0;
+
+  // ==== DHT22 ====
+  float suhu = dht.readTemperature();
+  float lembap = dht.readHumidity();
+  if (isnan(suhu) || isnan(lembap)) {
+    suhu = 0;
+    lembap = 0;
+  }
+
+  // ==== MH-RD Rain Sensor ====
+  bool hujan = digitalRead(rainPin) == LOW;  
+  // LOW = hujan, HIGH = tidak hujan
+
+  String statusHujan = hujan ? "Hujan" : "Cerah";
+
+  // ==== STATUS SIAGA ====
+  String statusSiaga;
+  if (distance < 37.5) {
+    statusSiaga = "Siaga 4 (Normal)";
+  } else if (distance >= 37.5 && distance <= 62.5) {
+    statusSiaga = "Siaga 3";
+  } else if (distance > 62.5 && distance <= 75) {
+    statusSiaga = "Siaga 2";
+  } else if (distance > 75) {
+    statusSiaga = "Siaga 1";
+  }
+
+  // ==== SERIAL ====
+  Serial.print("Air: ");
+  Serial.print(tinggiAir);
+  Serial.print(" cm | Suhu: ");
+  Serial.print(suhu);
+  Serial.print(" C | Hum: ");
+  Serial.print(lembap);
+  Serial.print("% | Cuaca: ");
+  Serial.print(statusHujan);
+  Serial.print(" | Status: ");
+  Serial.println(statusSiaga);
+
+  // ==== LCD ====
+  lcd.clear();
+
+  // Baris 1
+  lcd.setCursor(0, 0);
+  lcd.print("A:");
+  lcd.print(tinggiAir, 0);
+  lcd.print("cm ");
+
+  lcd.print(suhu, 0);
+  lcd.print("C");
+
+  // Baris 2
+  lcd.setCursor(0, 1);
+  lcd.print(statusHujan);
+  lcd.print(" ");
+
+  // tampilkan singkatan status (S1-S4)
+  if (statusSiaga == "Siaga 4 (Normal)") lcd.print("S4");
+  else if (statusSiaga == "Siaga 3") lcd.print("S3");
+  else if (statusSiaga == "Siaga 2") lcd.print("S2");
+  else if (statusSiaga == "Siaga 1") lcd.print("S1");
+
+  delay(800);
+}
