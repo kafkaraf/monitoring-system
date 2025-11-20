@@ -11,7 +11,7 @@
 const int trigPin = D6;    // JSN-SR04T TRIG
 const int echoPin = D7;    // JSN-SR04T ECHO
 
-const int rainPin = D0;    // MH-RD digital output (HIGH = tidak hujan, LOW = hujan)
+const int rainPin = D8;    // MH-RD digital output (HIGH = tidak hujan, LOW = hujan)
 
 // Tinggi bak / sungai dalam cm
 const float tinggiBak = 100.0;
