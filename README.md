@@ -12,6 +12,20 @@ Branch ini mencakup pengembangan fitur:
 - **Pengiriman data sensor melalui MQTT**  
 - **Optimasi komunikasi antara ESP8266 → Broker → Subscriber**
 
+  ## **Setup Proyek**
+
+### **1. Instalasi Library ESP8266 & MQTT**
+- Buka **Arduino IDE** → **Tools** → **Manage Libraries**  
+- Install library **ESP8266** dan **PubSubClient**
+
+### **2. Koneksi Hardware**
+- Sambungkan **sensor ultrasonik** ke NodeMCU sesuai pin yang telah dikonfigurasi  
+- Sambungkan **NodeMCU** ke komputer/laptop via USB
+
+### **3. Konfigurasi WiFi**
+- Masukkan **SSID** dan **Password** WiFi Anda di kode  
+- Pastikan **NodeMCU** dapat terhubung ke jaringan
+
 ---
 
 ## **Konsep Broker & Subscriber**
@@ -22,16 +36,25 @@ Menggunakan **Mosquitto** sebagai MQTT client untuk menerima data sensor:
 ```bash
 mosquitto_sub.exe -h broker.mqtt-dashboard.com -t rafi/sensor
 
+bash```
+
 ### **2. Publisher (ESP8266)
 ESP8266 mengirim data ke MQTT Broker dengan konfigurasi:
 
 ```bash
 const char* mqtt_server = "broker.mqtt-dashboard.com";
 const int mqtt_port = 1883;
+bash```
+
 
 Mengirim data dengan:
 ```bash
 client.publish("rafi/sensor", payload.c_str());
+bash```
+
+---
+
+
 
 
 
