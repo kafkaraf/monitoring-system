@@ -36,7 +36,7 @@ Menggunakan **Mosquitto** sebagai MQTT client untuk menerima data sensor:
 ```bash
 mosquitto_sub.exe -h broker.mqtt-dashboard.com -t rafi/sensor
 
-bash```
+```
 
 ### **2. Publisher (ESP8266)**  
 ESP8266 mengirim data ke **MQTT Broker** dengan konfigurasi:
@@ -44,6 +44,7 @@ ESP8266 mengirim data ke **MQTT Broker** dengan konfigurasi:
 ```cpp
 const char* mqtt_server = "broker.mqtt-dashboard.com";
 const int mqtt_port = 1883;
+```
 
 
 
