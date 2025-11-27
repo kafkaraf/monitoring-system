@@ -38,21 +38,12 @@ mosquitto_sub.exe -h broker.mqtt-dashboard.com -t rafi/sensor
 
 bash```
 
-### **2. Publisher (ESP8266)
-ESP8266 mengirim data ke MQTT Broker dengan konfigurasi:
+### **2. Publisher (ESP8266)**  
+ESP8266 mengirim data ke **MQTT Broker** dengan konfigurasi:
 
-```bash
+```cpp
 const char* mqtt_server = "broker.mqtt-dashboard.com";
 const int mqtt_port = 1883;
-bash```
-
-
-Mengirim data dengan:
-```bash
-client.publish("rafi/sensor", payload.c_str());
-bash```
-
----
 
 
 
