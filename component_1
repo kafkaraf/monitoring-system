@@ -1,0 +1,193 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
+// KONFIGURASI PIN
+#define DHTPIN D5
+#define DHTTYPE DHT22
+
+const int trigPin = D4;
+const int echoPin = D7;
+const int rainPin = D8;
+const int ledPin  = D4;
+
+// RELAY & SWITCH (LOKAL)
+const int relayPin  = D0;
+const int switchPin = D6;
+
+// TINGGI BAK / TANGGUL (cm)
+const float tinggiBak = 400.0;
+
+// WIFI & MQTT
+const char* ssid = "NilaFamily";
+const char* password = "mulyono123";
+
+const char* mqtt_server = "broker.mqtt-dashboard.com";
+const int   mqtt_port   = 1883;
+const char* mqtt_topic  = "rafi/sensor";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+ 
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// STATUS SISTEM (LED)
+enum StatusSystem { WIFI_LOST, MQTT_LOST, NORMAL };
+StatusSystem systemStatus = WIFI_LOST;
+
+unsigned long lastBlink = 0;
+bool ledState = false;
+
+  // LED STATUS SYSTEM
+void updateStatusLED() {
+  unsigned long interval;
+
+  if (systemStatus == WIFI_LOST)       interval = 150;
+  else if (systemStatus == MQTT_LOST)  interval = 400;
+  else                                 interval = 1000;
+
+  if (millis() - lastBlink >= interval) {
+    lastBlink = millis();
+    ledState = !ledState;
+    digitalWrite(ledPin, ledState);
+  }
+}
+
+  // WIFI SETUP
+void setupWiFi() {
+  Serial.print("Connecting WiFi");
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+  // MQTT RECONNECT
+void reconnectMQTT() {
+  while (!client.connected()) {
+    Serial.print("MQTT connecting...");
+    if (client.connect("ESP8266-Rafi-Sensor")) {
+      Serial.println("connected");
+    } else {
+      Serial.print("failed rc=");
+      Serial.println(client.state());
+      delay(3000);
+    }
+  }
+}
+
+  // SETUP
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(rainPin, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, HIGH); // Relay OFF (aktif LOW)
+
+  pinMode(switchPin, INPUT_PULLUP);
+
+  dht.begin();
+
+  lcd.init();
+  lcd.backlight();
+  lcd.print(" Water Monitor ");
+  delay(1500);
+  lcd.clear();
+
+  setupWiFi();
+  client.setServer(mqtt_server, mqtt_port);
+}
+
+  // LOOP
+ 
+void loop() {
+
+   // RELAY MANUAL (LOKAL)
+   if (digitalRead(switchPin) == LOW) {
+    digitalWrite(relayPin, LOW);
+  } else {
+    digitalWrite(relayPin, HIGH);
+  }
+
+   // STATUS SISTEM
+   if (WiFi.status() != WL_CONNECTED) systemStatus = WIFI_LOST;
+  else if (!client.connected())      systemStatus = MQTT_LOST;
+  else                               systemStatus = NORMAL;
+
+  updateStatusLED();
+
+  if (!client.connected()) reconnectMQTT();
+  client.loop();
+
+  // SENSOR ULTRASONIC
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 30000);
+  float distance = duration * 0.034 / 2.0;
+  float tinggiAir = tinggiBak - distance;
+    if (tinggiAir < 0) tinggiAir = 0;
+
+  // SENSOR DHT22
+  float suhu = dht.readTemperature();
+  float kelembaban = dht.readHumidity();
+
+  if (isnan(suhu) || isnan(kelembaban)) {
+    suhu = 0;
+    kelembaban = 0;
+  }
+
+  // SENSOR HUJAN
+  int rainState = digitalRead(rainPin);
+  String cuaca = (rainState == LOW) ? "Hujan" : "Tidak Hujan";
+
+  // SERIAL DEBUG
+  Serial.print("Air: "); Serial.print(tinggiAir);
+  Serial.print(" | Suhu: "); Serial.print(suhu);
+  Serial.print(" | Hum: "); Serial.print(kelembaban);
+  //Serial.print(" | Cuaca: "); Serial.println(cuaca);
+  Serial.print("\n");
+
+
+  // MQTT PAYLOAD (MENTAH)
+  String payload = "{";
+  payload += "\"tinggi_air\":"; payload += tinggiAir; payload += ",";
+  payload += "\"suhu\":"; payload += suhu; payload += ",";
+  payload += "\"kelembaban\":"; payload += kelembaban;
+  payload += "}";
+
+
+  client.publish(mqtt_topic, payload.c_str());
+
+   // LCD DISPLAY
+   lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Air:");
+  lcd.print(tinggiAir, 0);
+  lcd.print("cm ");
+  lcd.print(suhu, 0);
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Sensor Aktif");
+
+  delay(1000);
+}
